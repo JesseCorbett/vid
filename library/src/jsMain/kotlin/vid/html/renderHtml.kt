@@ -5,21 +5,41 @@ import kotlinx.html.Tag
 import kotlinx.html.TagConsumer
 import kotlinx.html.Unsafe
 import kotlinx.html.org.w3c.dom.events.Event
+import vid.RenderFunction
+import vid.h
 import vue.VNode
+import kotlin.js.json
 
-fun renderHtml(builder: TagConsumer<*>.() -> Unit): VNode {
-    return VidTagConsumer().apply(builder).finalize()
+fun renderHtml(builder: TagConsumer<*>.() -> Unit): RenderFunction {
+    return { VidTagConsumer().apply(builder).finalize() }
 }
 
 class VidTagConsumer : TagConsumer<VNode> {
-    private val vNodeStack = mutableListOf<VNode>()
+    sealed interface VNodeContent
+    class VNodeBuilder(
+        val tag: String,
+        val attrs: MutableMap<String, String>,
+        val children: MutableList<VNodeContent> = mutableListOf(),
+        val events: MutableMap<String, (Event) -> Unit> = mutableMapOf()
+    ) : VNodeContent
+    class VNodeText(val text: String) : VNodeContent
+
+    private val vNodeStack = mutableListOf<VNodeBuilder>()
+    private val currentVNode: VNodeBuilder?
+        get() = vNodeStack.lastOrNull()
 
     override fun onTagStart(tag: Tag) {
-        TODO("Not yet implemented")
+        val builder = VNodeBuilder(tag.tagName, attrs = tag.attributes)
+        currentVNode?.children?.add(builder)
+        vNodeStack.add(builder)
     }
 
     override fun onTagAttributeChange(tag: Tag, attribute: String, value: String?) {
-        TODO("Not yet implemented")
+        if (value == null) {
+            currentVNode!!.attrs.remove(attribute)
+        } else {
+            currentVNode!!.attrs[attribute] = value
+        }
     }
 
     override fun onTagEvent(
@@ -27,31 +47,51 @@ class VidTagConsumer : TagConsumer<VNode> {
         event: String,
         value: (Event) -> Unit
     ) {
-        TODO("Not yet implemented")
+        currentVNode!!.events[event] = value
     }
 
     override fun onTagEnd(tag: Tag) {
-        TODO("Not yet implemented")
+        if (vNodeStack.size > 1) {
+            vNodeStack.removeLast()
+        }
     }
 
     override fun onTagContent(content: CharSequence) {
-        TODO("Not yet implemented")
+        currentVNode!!.children.add(VNodeText(content.toString()))
     }
 
     override fun onTagContentEntity(entity: Entities) {
-        TODO("Not yet implemented")
+        currentVNode!!.children.add(VNodeText(entity.text))
     }
 
     override fun onTagContentUnsafe(block: Unsafe.() -> Unit) {
-        TODO("Not yet implemented")
+        // Unimplemented
     }
 
     override fun onTagComment(content: CharSequence) {
-        TODO("Not yet implemented")
+        // Unimplemented
     }
 
     override fun finalize(): VNode {
-        TODO("Not yet implemented")
+        return currentVNode!!.finalize()
     }
 
+    private fun VNodeBuilder.finalize(): VNode {
+        // TODO: Convert attrs to vue's expected format
+        fun capitalizeThirdLetter(input: String): String {
+            return "${input.substring(0, 2)}${input[2].uppercase()}${input.substring(3)}"
+        }
+
+        val adaptedEvents = events.map { capitalizeThirdLetter(it.key) to it.value }
+        val adaptedProps = attrs.map { it.key to it.value }
+
+        val props = json(*(adaptedEvents + adaptedProps).toTypedArray())
+        val node = h(tag, props, children.map {
+            when (it) {
+                is VNodeBuilder -> it.finalize()
+                is VNodeText -> it.text
+            }
+        }.toTypedArray())
+        return node
+    }
 }

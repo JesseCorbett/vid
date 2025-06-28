@@ -1,24 +1,31 @@
 package com.jessecorbett.vid
 
-import vid.*
-import kotlin.js.json
+import kotlinx.html.br
+import kotlinx.html.button
+import kotlinx.html.div
+import kotlinx.html.js.onClickFunction
+import kotlinx.html.span
+import vid.computed
+import vid.createApp
+import vid.html.renderHtml
+import vid.ref
 
 fun main() {
-    val setup = setup<Unit> {
+    val app = createApp {
         var count by ref(0)
         val next by computed { count + 1 }
 
-        render {
-            h(
-                "div",
-                json(
-                    "onClick" to { count++ }
-                ),
-                "Clicked $count times. Click one more to be at $next"
-            )
+        renderHtml {
+            div {
+                span { +"You have clicked the button $count times, care to go for $next?" }
+                br
+                button {
+                    onClickFunction = { count++ }
+                    +"Click me"
+                }
+            }
         }
     }
 
-    val app = createApp(json("setup" to setup))
     app.mount("#app")
 }

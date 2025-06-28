@@ -3,7 +3,12 @@ package vue
 
 import kotlin.js.Promise
 
-external interface VNode
+external interface VNode {
+    val type: String
+    val props: dynamic
+    val children: Array<dynamic>
+    val key: String?
+}
 
 external class Plugin
 

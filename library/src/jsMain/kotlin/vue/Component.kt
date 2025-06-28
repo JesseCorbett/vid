@@ -1,7 +1,7 @@
 @file:JsModule("vue")
 package vue
 
-external class Component : VNode
+external interface Component
 
 external fun defineComponent(component: ComponentOptions): dynamic
 
