@@ -1,27 +1,12 @@
+@file:JsModule("vue")
 package vue
 
-@JsModule("vue")
-external object Vue {
-    interface VNode
+import kotlin.js.Promise
 
-    fun h(element: String, props: dynamic, children: dynamic): VNode
+external interface VNode
 
-    class VueApp {
-        fun mount(element: String)
-        val config: dynamic
-    }
+external class Plugin
 
-    fun createApp(options: dynamic): VueApp
+external val version: String
 
-    interface Ref<T> {
-        var value: T
-    }
-
-    fun <T> ref(value: T): Ref<T>
-
-    interface ReadonlyRef<T> {
-        val value: T
-    }
-
-    fun <T> computed(getter: () -> T): ReadonlyRef<T>
-}
+external fun nextTick(callback: () -> Unit): Promise<Unit>

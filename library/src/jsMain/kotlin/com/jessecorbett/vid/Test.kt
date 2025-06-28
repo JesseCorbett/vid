@@ -1,30 +1,24 @@
 package com.jessecorbett.vid
 
-import vue.Vue
+import vid.*
 import kotlin.js.json
 
-typealias RenderFunction = () -> Vue.VNode
-
 fun main() {
+    val setup = setup<Unit> {
+        var count by ref(0)
+        val next by computed { count + 1 }
 
-    fun setup(props: Any): RenderFunction {
-        var count by Reactive(0)
-
-        val next = Vue.computed { count + 1 }
-
-        return {
-            Vue.h(
+        render {
+            h(
                 "div",
                 json(
                     "onClick" to { count++ }
                 ),
-                "Clicked $count times. Click one more to be at ${next.value}"
+                "Clicked $count times. Click one more to be at $next"
             )
         }
     }
 
-    val app = Vue.createApp(json("setup" to ::setup))
-    app.config.performance = true
-    app.config.devtools = true
+    val app = createApp(json("setup" to setup))
     app.mount("#app")
 }
