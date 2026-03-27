@@ -1,17 +1,14 @@
 @file:JsModule("vue")
 package vue
 
+import kotlin.js.Promise
+
 external interface Component
 
-external fun defineComponent(component: ComponentOptions): dynamic
+external fun defineComponent(options: dynamic?): Component
 
-external fun defineComponent(setup: (Any) -> Unit)
+external fun defineAsyncComponent(loader: () -> Promise<Component>): Component
 
-external fun defineComponent(
-    setup: (Any) -> Unit,
-    extraOptions: ComponentOptions
-): () -> Any
-
-external interface ComponentOptions {
-
+external interface SetupContext {
+    fun expose(data: dynamic)
 }

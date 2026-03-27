@@ -1,4 +1,4 @@
-import com.vanniktech.maven.publish.SonatypeHost
+import org.jetbrains.kotlin.gradle.dsl.KotlinJsCompile
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -8,12 +8,22 @@ plugins {
 group = "com.jessecorbett.vid"
 version = "1.0.0"
 
+tasks.withType<KotlinJsCompile>().configureEach {
+    compilerOptions {
+        target = "es2015"
+    }
+}
+
 kotlin {
+
     jvm()
     js {
         browser {
             useEsModules()
-            binaries.executable()
+//            binaries.executable()
+        }
+        compilerOptions {
+            freeCompilerArgs.add("-Xcontext-parameters")
         }
     }
 
@@ -32,16 +42,15 @@ kotlin {
         val jsMain by getting {
             dependencies {
                 api(libs.kotlinx.html)
-                api(npm("vue", "3.5.17"))
+                api(npm("vue", "3.5.30"))
             }
         }
     }
 }
 
 mavenPublishing {
-    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
-
-    signAllPublications()
+    publishToMavenCentral()
+//    signAllPublications()
 
     coordinates(group.toString(), "library", version.toString())
 

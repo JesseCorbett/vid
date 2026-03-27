@@ -1,13 +1,15 @@
 package vid
 
+import vue.Reactive
+import vue.Ref
 import kotlin.reflect.KProperty
 
 fun <T> ref(value: T): RefDelegate<T> {
-    return RefDelegate(value)
+    val ref = vue.ref(value)
+    return RefDelegate(ref)
 }
 
-class RefDelegate<T>(value: T) {
-    private val ref = vue.ref(value)
+class RefDelegate<T>(private val ref: Ref<T>) {
 
     operator fun getValue(thisRef: Any?, property: KProperty<*>): T {
         return ref.value
@@ -19,13 +21,17 @@ class RefDelegate<T>(value: T) {
 }
 
 fun <T> computed(getter: () -> T): ComputedDelegate<T> {
-    return ComputedDelegate(getter)
+    val computed = vue.computed(getter)
+    return ComputedDelegate(computed)
 }
 
-class ComputedDelegate<T>(getter: () -> T) {
-    private val reactive = vue.computed(getter)
+class ComputedDelegate<T>(private val reactive: Reactive<T>) {
 
     operator fun getValue(thisRef: Any?, property: KProperty<*>): T {
         return reactive.value
     }
+}
+
+fun <T> injectFactory(key: String, defaultValue: () -> T): T {
+    return vue.inject(key, defaultValue, true)
 }

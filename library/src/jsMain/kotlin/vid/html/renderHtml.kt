@@ -1,35 +1,70 @@
 package vid.html
 
 import kotlinx.html.Entities
+import kotlinx.html.HTMLTag
+import kotlinx.html.HtmlInlineTag
 import kotlinx.html.Tag
 import kotlinx.html.TagConsumer
 import kotlinx.html.Unsafe
 import kotlinx.html.org.w3c.dom.events.Event
+import kotlinx.html.visit
 import vid.RenderFunction
-import vid.h
+import vue.Component
 import vue.VNode
 import kotlin.js.json
 
-fun renderHtml(builder: TagConsumer<*>.() -> Unit): RenderFunction {
+inline fun renderHtml(crossinline builder: TagConsumer<*>.() -> Unit): RenderFunction {
     return { VidTagConsumer().apply(builder).finalize() }
+}
+
+class COMPONENT(consumer: TagConsumer<*>, val component: Component) : HTMLTag(
+    tagName = "vue-component",
+    consumer = consumer,
+    initialAttributes = emptyMap(),
+    inlineTag = false,
+    emptyTag = false
+), HtmlInlineTag
+
+fun Tag.component(component: Component, block: COMPONENT.() -> Unit) {
+    COMPONENT(consumer, component).visit(block)
+}
+
+context(tag: Tag)
+operator fun Component.invoke(block: COMPONENT.() -> Unit = {}) {
+    tag.component(this, block)
 }
 
 class VidTagConsumer : TagConsumer<VNode> {
     sealed interface VNodeContent
+    sealed interface VNodeContentWithChildren : VNodeContent {
+        val attrs: MutableMap<String, String>
+        val children: MutableList<VNodeContent>
+        val events: MutableMap<String, (Event) -> Unit>
+    }
     class VNodeBuilder(
         val tag: String,
-        val attrs: MutableMap<String, String>,
-        val children: MutableList<VNodeContent> = mutableListOf(),
-        val events: MutableMap<String, (Event) -> Unit> = mutableMapOf()
-    ) : VNodeContent
+        override val attrs: MutableMap<String, String>,
+        override val children: MutableList<VNodeContent> = mutableListOf(),
+        override val events: MutableMap<String, (Event) -> Unit> = mutableMapOf()
+    ) : VNodeContentWithChildren
     class VNodeText(val text: String) : VNodeContent
+    class VNodeComponent(
+        val component: Component,
+        override val attrs: MutableMap<String, String>,
+        override val children: MutableList<VNodeContent> = mutableListOf(),
+        override val events: MutableMap<String, (Event) -> Unit> = mutableMapOf()
+    ) : VNodeContentWithChildren
 
-    private val vNodeStack = mutableListOf<VNodeBuilder>()
-    private val currentVNode: VNodeBuilder?
+    private val vNodeStack = mutableListOf<VNodeContentWithChildren>()
+    private val currentVNode: VNodeContentWithChildren?
         get() = vNodeStack.lastOrNull()
 
     override fun onTagStart(tag: Tag) {
-        val builder = VNodeBuilder(tag.tagName, attrs = tag.attributes)
+        val builder = if (tag is COMPONENT) {
+            VNodeComponent(tag.component, attrs = tag.attributes)
+        } else {
+            VNodeBuilder(tag.tagName, attrs = tag.attributes)
+        }
         currentVNode?.children?.add(builder)
         vNodeStack.add(builder)
     }
@@ -76,7 +111,7 @@ class VidTagConsumer : TagConsumer<VNode> {
         return currentVNode!!.finalize()
     }
 
-    private fun VNodeBuilder.finalize(): VNode {
+    private fun VNodeContentWithChildren.finalize(): VNode {
         // TODO: Convert attrs to vue's expected format
         fun capitalizeThirdLetter(input: String): String {
             return "${input.substring(0, 2)}${input[2].uppercase()}${input.substring(3)}"
@@ -86,12 +121,22 @@ class VidTagConsumer : TagConsumer<VNode> {
         val adaptedProps = attrs.map { it.key to it.value }
 
         val props = json(*(adaptedEvents + adaptedProps).toTypedArray())
-        val node = h(tag, props, children.map {
-            when (it) {
-                is VNodeBuilder -> it.finalize()
-                is VNodeText -> it.text
-            }
-        }.toTypedArray())
+        val node = when (this) {
+            is VNodeBuilder -> vue.h(tag, props, children.map {
+                when (it) {
+                    is VNodeContentWithChildren -> it.finalize()
+                    is VNodeText -> it.text
+                }
+            }.toTypedArray())
+            is VNodeComponent -> vue.h(component, props, {
+                children.map {
+                    when (it) {
+                        is VNodeContentWithChildren -> it.finalize()
+                        is VNodeText -> it.text
+                    }
+                }.toTypedArray()
+            })
+        }
         return node
     }
 }
